@@ -131,7 +131,7 @@ public class Router {
         }
     }
 
-    private void checkNoLegacyParameters(GHRequest request) {
+    void checkNoLegacyParameters(GHRequest request) {
         if (request.getHints().has("vehicle"))
             throw new IllegalArgumentException("GHRequest may no longer contain a vehicle, use the profile parameter instead, see docs/core/profiles.md");
         if (request.getHints().has("weighting"))
