@@ -1,5 +1,10 @@
 name: Build and Test
+
 on: push
+
+permissions:
+  contents: write   # Needed so the bot can commit/push the updated mutation-threshold.txt
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -7,12 +12,15 @@ jobs:
       fail-fast: false
       matrix:
         java-version: [ 24, 25-ea ]
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
           distribution: temurin
+
       - name: Cache Maven artifacts
         uses: actions/cache@v4
         with:
@@ -20,20 +28,87 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+
       - name: Cache node
         uses: actions/cache@v4
         with:
           path: web-bundle/node
           key: ${{ runner.os }}-node-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os}}-node-
+            ${{ runner.os }}-node-
+
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
           path: web-bundle/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('**/pom.xml', '**/package.json') }}
           restore-keys: |
-            ${{ runner.os}}-node_modules-
+            ${{ runner.os }}-node_modules-
+
       - name: Build ${{ matrix.java-version }}
         run: mvn -B clean test
 
+      # --- ✅ Mutation testing step for main branch only ---
+      - name: Check and Update Mutation Score (on main)
+        if: |
+          success() &&
+          matrix.java-version == '24' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main'
+        run: |
+          echo "🔍 Running Pitest on 'main' to check and update score..."
+
+          #1 Ensure mutation-threshold.txt exists
+          if [ ! -f mutation-threshold.txt ]; then
+            echo "mutation-threshold.txt not found. Creating with default 0."
+            echo 0 > mutation-threshold.txt
+          fi
+
+          OLD_SCORE=$(cat mutation-threshold.txt | tr -d '\n' | tr -d '\r')
+          echo "Current stored mutation threshold: ${OLD_SCORE}%"
+
+          #2 Run Pitest (fails automatically if score < OLD_SCORE)
+          mvn -B org.pitest:pitest-maven:mutationCoverage -DmutationThreshold=$OLD_SCORE | tee pitest_output.log
+          PITEST_EXIT=${PIPESTATUS[0]}
+
+          if [ $PITEST_EXIT -ne 0 ]; then
+            echo "::error::Pitest failed (mutation score below threshold or build error)."
+            exit $PITEST_EXIT
+          fi
+
+          #3 Parse new score
+          LOG_LINE=$(grep "Generated .* mutations Killed" pitest_output.log || true)
+
+          if [ -z "$LOG_LINE" ]; then
+            echo "::error::Could not find the 'Generated ... Killed' line in pitest_output.log"
+            exit 1
+          fi
+
+          NEW_SCORE=$(echo "$LOG_LINE" | sed -E 's/.* \(([0-9]+)%\).*/\1/')
+
+          if [ -z "$NEW_SCORE" ]; then
+            echo "::error::Found the line, but could not parse the percentage."
+            echo "Line was: $LOG_LINE"
+            exit 1
+          fi
+
+          echo "Old Score: ${OLD_SCORE}%"
+          echo "New Score: ${NEW_SCORE}%"
+
+          #4 Compare and update threshold if improved
+          if [ "$NEW_SCORE" -gt "$OLD_SCORE" ]; then
+            echo "🎉 Mutation score improved! Updating threshold file..."
+
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+            echo "$NEW_SCORE" > mutation-threshold.txt
+            git add mutation-threshold.txt
+            git commit -m "chore(ci): Auto-update mutation threshold to ${NEW_SCORE}%"
+
+            git pull --rebase origin main
+            git push origin HEAD:main
+
+          else
+            echo "✅ Mutation score (${NEW_SCORE}%) not higher than previous (${OLD_SCORE}%). No update needed."
+          fi

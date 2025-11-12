@@ -167,8 +167,10 @@
                     </dependencies>
                     <configuration>
                         <targetClasses>
+                            <param>com.graphhopper.routing.Router</param>
                         </targetClasses>
                         <targetTests>
+                            <param>com.graphhopper.routing.RoutingCheckNoLegacyParametersTest</param>
                         </targetTests>
                         <outputFormats>
                             <outputFormat>XML</outputFormat>
