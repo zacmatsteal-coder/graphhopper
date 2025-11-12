@@ -48,15 +48,15 @@ jobs:
       - name: Build ${{ matrix.java-version }}
         run: mvn -B clean test
 
-      # --- ✅ Mutation testing step for main branch only ---
-      - name: Check and Update Mutation Score (on main)
+      # --- ✅ Mutation testing step for master branch only ---
+      - name: Check and Update Mutation Score (on master)
         if: |
           success() &&
           matrix.java-version == '24' &&
           github.event_name == 'push' &&
-          github.ref == 'refs/heads/main'
+          github.ref == 'refs/heads/master'
         run: |
-          echo "🔍 Running Pitest on 'main' to check and update score..."
+          echo "🔍 Running Pitest on 'master' to check and update score..."
 
           #1 Ensure mutation-threshold.txt exists
           if [ ! -f mutation-threshold.txt ]; then
@@ -106,8 +106,8 @@ jobs:
             git add mutation-threshold.txt
             git commit -m "chore(ci): Auto-update mutation threshold to ${NEW_SCORE}%"
 
-            git pull --rebase origin main
-            git push origin HEAD:main
+            git pull --rebase origin master
+            git push origin HEAD:master
 
           else
             echo "✅ Mutation score (${NEW_SCORE}%) not higher than previous (${OLD_SCORE}%). No update needed."
