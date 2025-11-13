@@ -68,7 +68,7 @@ jobs:
           echo "Current stored mutation threshold: ${OLD_SCORE}%"
 
           #2 Run Pitest (fails automatically if score < OLD_SCORE)
-          mvn -B org.pitest:pitest-maven:mutationCoverage -DmutationThreshold=$OLD_SCORE | tee pitest_output.log
+          mvn -B -pl core org.pitest:pitest-maven:mutationCoverage -DmutationThreshold=$OLD_SCORE | tee pitest_output.log
           PITEST_EXIT=${PIPESTATUS[0]}
 
           if [ $PITEST_EXIT -ne 0 ]; then
