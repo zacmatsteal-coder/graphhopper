@@ -46,7 +46,7 @@ jobs:
             ${{ runner.os }}-node_modules-
 
       - name: Build ${{ matrix.java-version }}
-        run: mvn -B clean test
+        run: mvn -B clean install
 
       # --- ✅ Mutation testing step for master branch only ---
       - name: Check and Update Mutation Score (on master)
