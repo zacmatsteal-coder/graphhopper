@@ -46,9 +46,30 @@ jobs:
             ${{ runner.os }}-node_modules-
 
       - name: Build ${{ matrix.java-version }}
+        id: build-and-test
         run: mvn -B clean install
+        continue-on-error: true
 
-      # --- ✅ Mutation testing step for master branch only ---
+      # Rickrolls when there's a failed test
+      - name: Generate diagnostics for the failed test...
+        if: steps.build-and-test.outcome == 'failure'
+        run: |
+          echo " "
+          echo "::error::[ERROR] ERROR: A critical assertion failed. Analyzing stack trace..."
+          echo "::error::[ERROR] "
+          echo "::error::[ERROR] java.lang.AssertionError: Test expectations not met."
+          echo "::error::[ERROR]     at com.graphhopper.Never.gonnaGiveYouUp(TestHelper.java:42)"
+          echo "::error::[ERROR]     at com.graphhopper.Never.gonnaLetYouDown(TestHelper.java:43)"
+          echo "::error::[ERROR]     at com.graphhopper.Never.gonnaRunAroundAndDesertYou(TestHelper.java:44)"
+          echo "::error::[ERROR]     at java.base/java.lang.reflect.Method.invoke(Method.java:568)"
+          echo "::error::[ERROR]     at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:75)"
+          echo "::error::[ERROR]     ... 23 more"
+          echo "::error::[ERROR] "
+          echo "::error::[ERROR] See full report for details: https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+          echo "::error::[ERROR] "
+          exit 1
+
+      # Mutation-score testing
       - name: Check and Update Mutation Score (on master)
         if: |
           success() &&
@@ -56,7 +77,7 @@ jobs:
           github.event_name == 'push' &&
           github.ref == 'refs/heads/master'
         run: |
-          echo "🔍 Running Pitest on 'master' to check and update score..."
+          echo "Running Pitest on 'master' to check and update score..."
 
           #1 Ensure mutation-threshold.txt exists
           if [ ! -f mutation-threshold.txt ]; then
@@ -97,7 +118,7 @@ jobs:
 
           #4 Compare and update threshold if improved
           if [ "$NEW_SCORE" -gt "$OLD_SCORE" ]; then
-            echo "🎉 Mutation score improved! Updating threshold file..."
+            echo "Mutation score improved! Updating threshold file..."
 
             git config --global user.name 'github-actions[bot]'
             git config --global user.email 'github-actions[bot]@users.noreply.github.com'
@@ -110,5 +131,5 @@ jobs:
             git push origin HEAD:master
 
           else
-            echo "✅ Mutation score (${NEW_SCORE}%) not higher than previous (${OLD_SCORE}%). No update needed."
+            echo "Mutation score (${NEW_SCORE}%) not higher than previous (${OLD_SCORE}%). No update needed."
           fi
