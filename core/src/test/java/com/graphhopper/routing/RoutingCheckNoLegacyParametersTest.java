@@ -146,4 +146,10 @@ public class RoutingCheckNoLegacyParametersTest {
         assertTrue(exception.getMessage().contains("edge_based"),
         "The method \"checkNoLegacyParameters\" should throw an exception for the edge_based legacy parameter");
     }
+
+    // Little test made to verify that the rickroll works well
+    @Test
+    public void testFail() {
+        assertTrue(false);
+    }
 }
